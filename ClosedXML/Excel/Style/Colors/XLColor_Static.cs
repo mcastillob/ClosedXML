@@ -185,6 +185,7 @@ namespace ClosedXML.Excel
                             {61, FromHtml("#FF993366")},
                             {62, FromHtml("#FF333399")},
                             {63, FromHtml("#FF333333")},
+                            {81, FromHtml("#FF333333")},
                             {64, FromColor(Color.Transparent)}
                         };
                     _indexedColors = retVal;
