@@ -1,13 +1,12 @@
-﻿using System;
+#nullable disable
+
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 
 namespace ClosedXML.Excel.CalcEngine.Functions
 {
     internal static class Database
     {
-        public static void Register(CalcEngine ce)
+        public static void Register(FunctionRegistry ce)
         {
             //ce.RegisterFunction("DAVERAGE", 3, Daverage); // Returns the average of selected database entries
             //ce.RegisterFunction("DCOUNT", 1, Dcount); // Counts the cells that contain numbers in a database
@@ -23,7 +22,7 @@ namespace ClosedXML.Excel.CalcEngine.Functions
             //ce.RegisterFunction("DVARP", 1, Dvarp); // Calculates variance based on the entire population of selected database entries
         }
 
-        static object Daverage(List<Expression> p)
+        private static object Daverage(List<Expression> p)
         {
             var b = true;
             foreach (var v in p)

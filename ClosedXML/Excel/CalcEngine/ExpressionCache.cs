@@ -1,6 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+#nullable disable
+
+using System.Runtime.CompilerServices;
 
 namespace ClosedXML.Excel.CalcEngine
 {
@@ -11,61 +11,28 @@ namespace ClosedXML.Excel.CalcEngine
     /// <remarks>
     /// Uses weak references to avoid accumulating unused expressions.
     /// </remarks>
-    class ExpressionCache
+    internal sealed class ExpressionCache
     {
-        Dictionary<string, WeakReference> _dct;
-        CalcEngine _ce;
-        int _hitCount;
+        private readonly ConditionalWeakTable<string, Formula> _cache;
+        private readonly XLCalcEngine _ce;
 
-        public ExpressionCache(CalcEngine ce)
+        public ExpressionCache(XLCalcEngine ce)
         {
             _ce = ce;
-            _dct = new Dictionary<string, WeakReference>();
+            _cache = new ConditionalWeakTable<string, Formula>();
         }
 
         // gets the parsed version of a string expression
-        public Expression this[string expression]
+        public Formula this[string expression]
         {
             get
             {
-                Expression x;
-                WeakReference wr;
-                if (_dct.TryGetValue(expression, out wr) && wr.IsAlive)
+                if (!_cache.TryGetValue(expression, out var formula))
                 {
-                    x = wr.Target as Expression;
+                    formula = _ce.Parse(expression);
+                    _cache.Add(expression, formula);
                 }
-                else
-                {
-                    // remove all dead references from dictionary
-                    if (wr != null && _dct.Count > 100 && _hitCount++ > 100)
-                    {
-                        RemoveDeadReferences();
-                        _hitCount = 0;
-                    }
-
-                    // store this expression
-                    x = _ce.Parse(expression);
-                    _dct[expression] = new WeakReference(x);
-                }
-                return x;
-            }
-        }
-
-        // remove all dead references from the cache
-        void RemoveDeadReferences()
-        {
-            for (bool done = false; !done; )
-            {
-                done = true;
-                foreach (var k in _dct.Keys)
-                {
-                    if (!_dct[k].IsAlive)
-                    {
-                        _dct.Remove(k);
-                        done = false;
-                        break;
-                    }
-                }
+                return formula;
             }
         }
     }

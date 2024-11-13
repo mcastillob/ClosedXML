@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -10,14 +10,17 @@ namespace ClosedXML.Excel
             Start = start;
             End = end;
         }
-        public String Text { get; set; }
-        public Int32 Start { get; set; }
-        public Int32 End { get; set; }
+        public String Text { get; }
+        public Int32 Start { get; }
+        public Int32 End { get; }
 
-        public bool Equals(IXLPhonetic other)
+        public bool Equals(IXLPhonetic? other)
         {
-            if (other == null)
+            if (other is null)
                 return false;
+
+            if (ReferenceEquals(this, other))
+                return true;
 
             return Text == other.Text && Start == other.Start && End == other.End;
         }

@@ -1,4 +1,6 @@
-﻿using System;
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -18,6 +20,12 @@ namespace ClosedXML.Excel
                 HorizontalDpi = defaultPageOptions.HorizontalDpi;
                 PageOrientation = defaultPageOptions.PageOrientation;
                 VerticalDpi = defaultPageOptions.VerticalDpi;
+                FirstRowToRepeatAtTop = defaultPageOptions.FirstRowToRepeatAtTop;
+                LastRowToRepeatAtTop = defaultPageOptions.LastRowToRepeatAtTop;
+                FirstColumnToRepeatAtLeft = defaultPageOptions.FirstColumnToRepeatAtLeft;
+                LastColumnToRepeatAtLeft = defaultPageOptions.LastColumnToRepeatAtLeft;
+                ShowComments = defaultPageOptions.ShowComments;
+
 
                 PaperSize = defaultPageOptions.PaperSize;
                 _pagesTall = defaultPageOptions.PagesTall;
@@ -83,8 +91,7 @@ namespace ClosedXML.Excel
         public void SetColumnsToRepeatAtLeft(String range)
         {
             var arrRange = range.Replace("$", "").Split(':');
-            Int32 iTest;
-            if (Int32.TryParse(arrRange[0], out iTest))
+            if (Int32.TryParse(arrRange[0], out int iTest))
                 SetColumnsToRepeatAtLeft(Int32.Parse(arrRange[0]), Int32.Parse(arrRange[1]));
             else
                 SetColumnsToRepeatAtLeft(arrRange[0], arrRange[1]);
@@ -106,7 +113,7 @@ namespace ClosedXML.Excel
         public XLPaperSize PaperSize { get; set; }
         public Int32 HorizontalDpi { get; set; }
         public Int32 VerticalDpi { get; set; }
-        public Int64 FirstPageNumber { get; set; }
+        public Int32? FirstPageNumber { get; set; }
         public Boolean CenterHorizontally { get; set; }
         public Boolean CenterVertically { get; set; }
         public XLPrintErrorValues PrintErrorValue { get; set; }
@@ -219,7 +226,7 @@ namespace ClosedXML.Excel
         public IXLPageSetup SetScale(Int32 value) { Scale = value; return this; }
         public IXLPageSetup SetHorizontalDpi(Int32 value) { HorizontalDpi = value; return this; }
         public IXLPageSetup SetVerticalDpi(Int32 value) { VerticalDpi = value; return this; }
-        public IXLPageSetup SetFirstPageNumber(Int64 value) { FirstPageNumber = value; return this; }
+        public IXLPageSetup SetFirstPageNumber(Int32? value) { FirstPageNumber = value; return this; }
         public IXLPageSetup SetCenterHorizontally() { CenterHorizontally = true; return this; }	public IXLPageSetup SetCenterHorizontally(Boolean value) { CenterHorizontally = value; return this; }
         public IXLPageSetup SetCenterVertically() { CenterVertically = true; return this; }	public IXLPageSetup SetCenterVertically(Boolean value) { CenterVertically = value; return this; }
         public IXLPageSetup SetPaperSize(XLPaperSize value) { PaperSize = value; return this; }

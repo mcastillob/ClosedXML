@@ -1,35 +1,36 @@
-﻿namespace ClosedXML.Excel
+#nullable disable
+
+using System;
+using System.Linq;
+
+namespace ClosedXML.Excel
 {
-    using System;
-    using System.Linq;
-
-
     internal class XLRangeColumn : XLRangeBase, IXLRangeColumn
     {
         #region Constructor
 
-        public XLRangeColumn(XLRangeParameters rangeParameters, bool quickLoad)
-            : base(rangeParameters.RangeAddress)
+        /// <summary>
+        /// The direct constructor should only be used in <see cref="XLWorksheet.RangeFactory"/>.
+        /// </summary>
+        public XLRangeColumn(XLRangeParameters rangeParameters)
+            : base(rangeParameters.RangeAddress, (rangeParameters.DefaultStyle as XLStyle).Value)
         {
-            if (quickLoad) return;
-
-			SubscribeToShiftedRows((range, rowsShifted) => this.WorksheetRangeShiftedRows(range, rowsShifted));
-			SubscribeToShiftedColumns((range, columnsShifted) => this.WorksheetRangeShiftedColumns(range, columnsShifted));
-            SetStyle(rangeParameters.DefaultStyle);
         }
 
-        #endregion
+        #endregion Constructor
 
         #region IXLRangeColumn Members
 
-        IXLCell IXLRangeColumn.Cell(int row)
+        IXLCell IXLRangeColumn.Cell(int rowNumber)
         {
-            return Cell(row);
+            return Cell(rowNumber);
         }
 
-        public new IXLCells Cells(string cellsInColumn)
+        IXLCells IXLRangeColumn.Cells(string cellsInColumn) => Cells(cellsInColumn);
+
+        public override XLCells Cells(string cellsInColumn)
         {
-            var retVal = new XLCells(false, false);
+            var retVal = new XLCells(false, XLCellsUsedOptions.AllContents);
             var rangePairs = cellsInColumn.Split(',');
             foreach (string pair in rangePairs)
                 retVal.Add(Range(pair.Trim()).RangeAddress);
@@ -43,6 +44,24 @@
 
         public void Delete()
         {
+            Delete(true);
+        }
+
+        internal void Delete(Boolean deleteTableField)
+        {
+            if (deleteTableField && IsTableColumn())
+            {
+                var table = Table as XLTable;
+                if (!Cell(1).Value.TryGetText(out var firstCellValue))
+                    throw new InvalidOperationException("Top cell doesn't contain a text.");
+
+                if (!table.FieldNames.ContainsKey(firstCellValue))
+                    throw new InvalidOperationException($"Field {firstCellValue} not found.");
+
+                var field = table.Fields.Cast<XLTableField>().Single(f => f.Name == firstCellValue);
+                field.Delete(false);
+            }
+
             Delete(XLShiftDeletedCells.ShiftCellsLeft);
         }
 
@@ -77,10 +96,9 @@
             return this;
         }
 
-
-        public new IXLRangeColumn CopyTo(IXLCell target)
+        public IXLRangeColumn CopyTo(IXLCell target)
         {
-            base.CopyTo(target);
+            base.CopyTo((XLCell)target);
 
             int lastRowNumber = target.Address.RowNumber + RowCount() - 1;
             if (lastRowNumber > XLHelper.MaxRowNumber)
@@ -136,9 +154,7 @@
                 string lastRow;
                 if (trimmedPair.Contains(':') || trimmedPair.Contains('-'))
                 {
-                    var rowRange = trimmedPair.Contains('-')
-                                       ? trimmedPair.Replace('-', ':').Split(':')
-                                       : trimmedPair.Split(':');
+                    var rowRange = trimmedPair.Split(':', '-');
 
                     firstRow = rowRange[0];
                     lastRow = rowRange[1];
@@ -155,32 +171,31 @@
             return retVal;
         }
 
-        public IXLRangeColumn SetDataType(XLCellValues dataType)
-        {
-            DataType = dataType;
-            return this;
-        }
-
         public IXLColumn WorksheetColumn()
         {
             return Worksheet.Column(RangeAddress.FirstAddress.ColumnNumber);
         }
 
-        #endregion
+        #endregion IXLRangeColumn Members
+
+        public override XLRangeType RangeType
+        {
+            get { return XLRangeType.RangeColumn; }
+        }
 
         public XLCell Cell(int row)
         {
             return Cell(row, 1);
         }
 
-        private void WorksheetRangeShiftedColumns(XLRange range, int columnsShifted)
+        internal override void WorksheetRangeShiftedColumns(XLRange range, int columnsShifted)
         {
-            ShiftColumns(RangeAddress, range, columnsShifted);
+            RangeAddress = (XLRangeAddress)ShiftColumns(RangeAddress, range, columnsShifted);
         }
 
-        private void WorksheetRangeShiftedRows(XLRange range, int rowsShifted)
+        internal override void WorksheetRangeShiftedRows(XLRange range, int rowsShifted)
         {
-            ShiftRows(RangeAddress, range, rowsShifted);
+            RangeAddress = (XLRangeAddress)ShiftRows(RangeAddress, range, rowsShifted);
         }
 
         public XLRange Range(int firstRow, int lastRow)
@@ -233,16 +248,20 @@
                 {
                     if (thisCell.DataType == otherCell.DataType)
                     {
-                        if (thisCell.DataType == XLCellValues.Text)
+                        if (thisCell.DataType == XLDataType.Blank)
+                            comparison = 0;
+                        else if (thisCell.DataType == XLDataType.Boolean)
+                            comparison = thisCell.GetBoolean().CompareTo(otherCell.GetBoolean());
+                        else if (thisCell.DataType == XLDataType.Text)
                         {
                             comparison = e.MatchCase
-                                             ? thisCell.InnerText.CompareTo(otherCell.InnerText)
-                                             : String.Compare(thisCell.InnerText, otherCell.InnerText, true);
+                                             ? thisCell.GetText().CompareTo(otherCell.GetText())
+                                             : String.Compare(thisCell.GetText(), otherCell.GetText(), true);
                         }
-                        else if (thisCell.DataType == XLCellValues.TimeSpan)
-                            comparison = thisCell.GetTimeSpan().CompareTo(otherCell.GetTimeSpan());
+                        else if (thisCell.DataType == XLDataType.Error)
+                            comparison = 0; // Errors are incomparable
                         else
-                            comparison = Double.Parse(thisCell.InnerText, XLHelper.NumberStyle, XLHelper.ParseCulture).CompareTo(Double.Parse(otherCell.InnerText, XLHelper.NumberStyle, XLHelper.ParseCulture));
+                            comparison = thisCell.CachedValue.GetUnifiedNumber().CompareTo(thisCell.CachedValue.GetUnifiedNumber());
                     }
                     else if (e.MatchCase)
                         comparison = String.Compare(thisCell.GetString(), otherCell.GetString(), true);
@@ -289,7 +308,7 @@
             return ColumnShift(step * -1);
         }
 
-        #endregion
+        #endregion XLRangeColumn Left
 
         #region XLRangeColumn Right
 
@@ -313,43 +332,58 @@
             return ColumnShift(step);
         }
 
-        #endregion
-
+        #endregion XLRangeColumn Right
 
         public IXLTable AsTable()
         {
-            using (var asRange = AsRange())
-               return asRange.AsTable();
+            if (IsTableColumn())
+                throw new InvalidOperationException("This column is already part of a table.");
+
+            return AsRange().AsTable();
         }
 
         public IXLTable AsTable(string name)
         {
-            using (var asRange = AsRange())
-                return asRange.AsTable(name);
+            if (IsTableColumn())
+                throw new InvalidOperationException("This column is already part of a table.");
+
+            return AsRange().AsTable(name);
         }
 
         public IXLTable CreateTable()
         {
-            using (var asRange = AsRange())
-                return asRange.CreateTable();
+            if (IsTableColumn())
+                throw new InvalidOperationException("This column is already part of a table.");
+
+            return AsRange().CreateTable();
         }
 
         public IXLTable CreateTable(string name)
         {
-            using (var asRange = AsRange())
-                return asRange.CreateTable(name);
+            if (IsTableColumn())
+                throw new InvalidOperationException("This column is already part of a table.");
+
+            return AsRange().CreateTable(name);
         }
 
-        public new IXLRangeColumn Clear(XLClearOptions clearOptions = XLClearOptions.ContentsAndFormats)
+        public new IXLRangeColumn Clear(XLClearOptions clearOptions = XLClearOptions.All)
         {
             base.Clear(clearOptions);
             return this;
         }
 
-        public IXLRangeColumn ColumnUsed(Boolean includeFormats = false)
+
+        public IXLRangeColumn ColumnUsed(XLCellsUsedOptions options = XLCellsUsedOptions.AllContents)
         {
-            return Column(FirstCellUsed(includeFormats), LastCellUsed(includeFormats));
+            return Column((this as IXLRangeBase).FirstCellUsed(options),
+                          (this as IXLRangeBase).LastCellUsed(options));
         }
 
+        internal IXLTable Table { get; set; }
+
+        public Boolean IsTableColumn()
+        {
+            return Table != null;
+        }
     }
 }

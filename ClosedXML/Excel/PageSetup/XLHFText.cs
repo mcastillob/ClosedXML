@@ -1,4 +1,6 @@
-﻿using System;
+#nullable disable
+
+using System;
 using System.Text;
 
 namespace ClosedXML.Excel
@@ -6,11 +8,13 @@ namespace ClosedXML.Excel
     internal class XLHFText
     {
         private readonly XLHFItem _hfItem;
+
         public XLHFText(XLRichString richText, XLHFItem hfItem)
         {
             RichText = richText;
             _hfItem = hfItem;
         }
+
         public XLRichString RichText { get; private set; }
 
         public String GetHFText(String prevText)
@@ -98,6 +102,5 @@ namespace ClosedXML.Excel
 
             return sb.ToString();
         }
-
     }
 }

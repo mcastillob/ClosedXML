@@ -1,4 +1,6 @@
-﻿using System;
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -20,9 +22,9 @@ namespace ClosedXML.Excel
         public String GetText(XLHFOccurrence occurrence)
         {
             var sb = new StringBuilder();
-            if(texts.ContainsKey(occurrence))
+            if(texts.TryGetValue(occurrence, out List<XLHFText> hfTexts))
             {
-                foreach (var hfText in texts[occurrence])
+                foreach (var hfText in hfTexts)
                     sb.Append(hfText.GetHFText(sb.ToString()));
             }
 
@@ -40,7 +42,7 @@ namespace ClosedXML.Excel
 
         public IXLRichString AddText(String text, XLHFOccurrence occurrence)
         {
-            XLRichString richText = new XLRichString(text, this.HeaderFooter.Worksheet.Style.Font, this);
+            var richText = new XLRichString(text, HeaderFooter.Worksheet.Style.Font, this, null);
 
             var hfText = new XLHFText(richText, this);
             if (occurrence == XLHFOccurrence.AllPages)
@@ -69,8 +71,8 @@ namespace ClosedXML.Excel
 
         private void AddTextToOccurrence(XLHFText hfText, XLHFOccurrence occurrence)
         {
-            if (texts.ContainsKey(occurrence))
-                texts[occurrence].Add(hfText);
+            if (texts.TryGetValue(occurrence, out List<XLHFText> hfTexts))
+                hfTexts.Add(hfText);
             else
                 texts.Add(occurrence, new List<XLHFText> { hfText });
 

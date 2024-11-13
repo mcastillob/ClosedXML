@@ -1,4 +1,6 @@
-﻿using System;
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -17,6 +19,7 @@ namespace ClosedXML.Excel
         IXLDrawingStyle SetFontColor(XLColor value);
         IXLDrawingStyle SetFontName(String value);
         IXLDrawingStyle SetFontFamilyNumbering(XLFontFamilyNumberingValues value);
-
+        IXLDrawingStyle SetFontCharSet(XLFontCharSet value);
+        IXLDrawingStyle SetFontScheme(XLFontScheme value);
     }
 }

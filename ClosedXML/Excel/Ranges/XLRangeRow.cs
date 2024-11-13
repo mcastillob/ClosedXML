@@ -1,41 +1,39 @@
-﻿namespace ClosedXML.Excel
+namespace ClosedXML.Excel
 {
     using System;
     using System.Linq;
-	
 
     internal class XLRangeRow : XLRangeBase, IXLRangeRow
     {
         #region Constructor
 
-        public XLRangeRow(XLRangeParameters rangeParameters, bool quickLoad)
-            : base(rangeParameters.RangeAddress)
+        /// <summary>
+        /// The direct constructor should only be used in <see cref="XLWorksheet.RangeFactory"/>.
+        /// </summary>
+        public XLRangeRow(XLRangeParameters rangeParameters)
+            : base(rangeParameters.RangeAddress, ((XLStyle)rangeParameters.DefaultStyle).Value)
         {
-            RangeParameters = rangeParameters;
-            if (quickLoad) return;
-            if (!RangeParameters.IgnoreEvents)
-            {
-                SubscribeToShiftedRows((range, rowsShifted) => this.WorksheetRangeShiftedRows(range, rowsShifted));
-                SubscribeToShiftedColumns((range, columnsShifted) => this.WorksheetRangeShiftedColumns(range, columnsShifted));
-            }
-            SetStyle(rangeParameters.DefaultStyle);
         }
 
-        #endregion
-
-        
-        public XLRangeParameters RangeParameters { get; private set; }
+        #endregion Constructor
 
         #region IXLRangeRow Members
+
+        IXLCells IXLRangeRow.Cells(string cellsInRow) => Cells(cellsInRow);
 
         public IXLCell Cell(int column)
         {
             return Cell(1, column);
         }
 
-        public new IXLCell Cell(string column)
+        public override XLCell Cell(string columnLetter)
         {
-            return Cell(1, column);
+            return Cell(1, columnLetter);
+        }
+
+        IXLCell IXLRangeRow.Cell(string columnLetter)
+        {
+            return Cell(columnLetter);
         }
 
         public void Delete()
@@ -63,9 +61,9 @@
             return InsertColumnsBefore(numberOfColumns, expandRange).Cells();
         }
 
-        public new IXLCells Cells(string cellsInRow)
+        public override XLCells Cells(string cellsInRow)
         {
-            var retVal = new XLCells(false, false);
+            var retVal = new XLCells(false, XLCellsUsedOptions.AllContents);
             var rangePairs = cellsInRow.Split(',');
             foreach (string pair in rangePairs)
                 retVal.Add(Range(pair.Trim()).RangeAddress);
@@ -99,9 +97,9 @@
             return this;
         }
 
-        public new IXLRangeRow CopyTo(IXLCell target)
+        public IXLRangeRow CopyTo(IXLCell target)
         {
-            base.CopyTo(target);
+            base.CopyTo((XLCell)target);
 
             int lastRowNumber = target.Address.RowNumber + RowCount() - 1;
             if (lastRowNumber > XLHelper.MaxRowNumber)
@@ -174,27 +172,25 @@
             return retVal;
         }
 
-        public IXLRangeRow SetDataType(XLCellValues dataType)
-        {
-            DataType = dataType;
-            return this;
-        }
-
         public IXLRow WorksheetRow()
         {
             return Worksheet.Row(RangeAddress.FirstAddress.RowNumber);
         }
 
-        #endregion
-
-        private void WorksheetRangeShiftedColumns(XLRange range, int columnsShifted)
+        #endregion IXLRangeRow Members
+        public override XLRangeType RangeType
         {
-            ShiftColumns(RangeAddress, range, columnsShifted);
+            get { return XLRangeType.RangeRow; }
         }
 
-        private void WorksheetRangeShiftedRows(XLRange range, int rowsShifted)
+        internal override void WorksheetRangeShiftedColumns(XLRange range, int columnsShifted)
         {
-            ShiftRows(RangeAddress, range, rowsShifted);
+            RangeAddress = (XLRangeAddress)ShiftColumns(RangeAddress, range, columnsShifted);
+        }
+
+        internal override void WorksheetRangeShiftedRows(XLRange range, int rowsShifted)
+        {
+            RangeAddress = (XLRangeAddress)ShiftRows(RangeAddress, range, rowsShifted);
         }
 
         public IXLRange Range(int firstColumn, int lastColumn)
@@ -247,17 +243,36 @@
                 {
                     if (thisCell.DataType == otherCell.DataType)
                     {
-                        if (thisCell.DataType == XLCellValues.Text)
+                        switch (thisCell.DataType)
                         {
-                            comparison = e.MatchCase
-                                             ? thisCell.InnerText.CompareTo(otherCell.InnerText)
-                                             : String.Compare(thisCell.InnerText, otherCell.InnerText, true);
+                            case XLDataType.Text:
+                                comparison = e.MatchCase
+                                                 ? thisCell.GetText().CompareTo(otherCell.GetText())
+                                                 : String.Compare(thisCell.GetText(), otherCell.GetText(), true);
+                                break;
+
+                            case XLDataType.TimeSpan:
+                                comparison = thisCell.GetTimeSpan().CompareTo(otherCell.GetTimeSpan());
+                                break;
+
+                            case XLDataType.DateTime:
+                                comparison = thisCell.GetDateTime().CompareTo(otherCell.GetDateTime());
+                                break;
+
+                            case XLDataType.Number:
+                                comparison = thisCell.GetDouble().CompareTo(otherCell.GetDouble());
+                                break;
+
+                            case XLDataType.Boolean:
+                                comparison = thisCell.GetBoolean().CompareTo(otherCell.GetBoolean());
+                                break;
+
+                            default:
+                                throw new NotImplementedException();
                         }
-                        else if (thisCell.DataType == XLCellValues.TimeSpan)
-                            comparison = thisCell.GetTimeSpan().CompareTo(otherCell.GetTimeSpan());
-                        else
-                            comparison = Double.Parse(thisCell.InnerText, XLHelper.NumberStyle, XLHelper.ParseCulture).CompareTo(Double.Parse(otherCell.InnerText, XLHelper.NumberStyle, XLHelper.ParseCulture));
                     }
+                    else if (thisCell.Value.IsUnifiedNumber && otherCell.Value.IsUnifiedNumber)
+                        comparison = thisCell.Value.GetUnifiedNumber().CompareTo(otherCell.Value.GetUnifiedNumber());
                     else if (e.MatchCase)
                         comparison = String.Compare(thisCell.GetString(), otherCell.GetString(), true);
                     else
@@ -265,7 +280,7 @@
                 }
 
                 if (comparison != 0)
-                    return e.SortOrder == XLSortOrder.Ascending ? comparison : comparison * -1;
+                    return e.SortOrder == XLSortOrder.Ascending ? comparison : -comparison;
             }
 
             return 0;
@@ -280,11 +295,8 @@
                 RangeAddress.FirstAddress.ColumnNumber,
                 rowNum,
                 RangeAddress.LastAddress.ColumnNumber);
-                
-            var result = range.FirstRow();
-            range.Dispose();
 
-            return result;
+            return range.FirstRow();
         }
 
         #region XLRangeRow Above
@@ -309,7 +321,7 @@
             return RowShift(step * -1);
         }
 
-        #endregion
+        #endregion XLRangeRow Above
 
         #region XLRangeRow Below
 
@@ -333,18 +345,19 @@
             return RowShift(step);
         }
 
-        #endregion
+        #endregion XLRangeRow Below
 
-        public new IXLRangeRow Clear(XLClearOptions clearOptions = XLClearOptions.ContentsAndFormats)
+        public new IXLRangeRow Clear(XLClearOptions clearOptions = XLClearOptions.All)
         {
             base.Clear(clearOptions);
             return this;
         }
 
-        public IXLRangeRow RowUsed(Boolean includeFormats = false)
-        {
-            return Row(FirstCellUsed(includeFormats), LastCellUsed(includeFormats));
-        }
 
+        public IXLRangeRow RowUsed(XLCellsUsedOptions options = XLCellsUsedOptions.AllContents)
+        {
+            return Row((this as IXLRangeBase).FirstCellUsed(options),
+                       (this as IXLRangeBase).LastCellUsed(options));
+        }
     }
 }

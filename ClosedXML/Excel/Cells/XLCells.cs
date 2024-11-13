@@ -1,162 +1,176 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace ClosedXML.Excel
 {
     using System.Linq;
 
-    internal class XLCells : IXLCells, IXLStylized, IEnumerable<XLCell>
+    internal class XLCells : XLStylizedBase, IXLCells, IXLStylized, IEnumerable<XLCell>
     {
-        public Boolean StyleChanged { get; set; }
         #region Fields
 
-        private readonly bool _includeFormats;
         private readonly List<XLRangeAddress> _rangeAddresses = new List<XLRangeAddress>();
         private readonly bool _usedCellsOnly;
-        private IXLStyle _style;
         private readonly Func<IXLCell, Boolean> _predicate;
-        #endregion
+        private readonly XLCellsUsedOptions _options;
+        private bool _styleInitialized = false;
+
+        #endregion Fields
 
         #region Constructor
 
-        public XLCells(bool usedCellsOnly, bool includeFormats, Func<IXLCell, Boolean> predicate = null)
+        public XLCells(bool usedCellsOnly, XLCellsUsedOptions options, Func<IXLCell, Boolean>? predicate = null)
+            : base(XLStyle.Default.Value)
         {
-            _style = new XLStyle(this, XLWorkbook.DefaultStyle);
             _usedCellsOnly = usedCellsOnly;
-            _includeFormats = includeFormats;
-            _predicate = predicate;
+            _options = options;
+            _predicate = predicate ?? (_ => true);
         }
 
-        #endregion
+        #endregion Constructor
 
         #region IEnumerable<XLCell> Members
 
-        public IEnumerator<XLCell> GetEnumerator()
+        private IEnumerable<XLCell> GetAllCells()
         {
-            var cellsInRanges = new Dictionary<XLWorksheet, HashSet<XLSheetPoint>>();
-            Boolean oneRange = _rangeAddresses.Count == 1;
-            foreach (XLRangeAddress range in _rangeAddresses)
+            var groupedAddresses = _rangeAddresses.GroupBy(addr => addr.Worksheet);
+            foreach (var worksheetGroup in groupedAddresses)
             {
-                HashSet<XLSheetPoint> hash;
-                if (cellsInRanges.ContainsKey(range.Worksheet))
-                    hash = cellsInRanges[range.Worksheet];
-                else
+                var ws = worksheetGroup.Key!;
+                var sheetPoints = worksheetGroup.SelectMany(addr => GetAllCellsInRange(addr))
+                    .Distinct();
+                foreach (var sheetPoint in sheetPoints)
                 {
-                    hash = new HashSet<XLSheetPoint>();
-                    cellsInRanges.Add(range.Worksheet, hash);
-                }
-
-                if (_usedCellsOnly)
-                {
-                    if (oneRange)
-                    {
-                        var cellRange = range.Worksheet.Internals.CellsCollection
-                                                .GetCells(
-                                                range.FirstAddress.RowNumber,
-                                                range.FirstAddress.ColumnNumber,
-                                                range.LastAddress.RowNumber,
-                                                range.LastAddress.ColumnNumber)
-                                                .Where(c => 
-                                                            !c.IsEmpty(_includeFormats) 
-                                                            && (_predicate == null || _predicate(c))
-                                                            );
-
-                        foreach(var cell in cellRange)
-                        {
-                            yield return cell;
-                        }
-                    }
-                    else
-                    {
-                        var tmpRange = range;
-                        var addressList = range.Worksheet.Internals.CellsCollection
-                            .GetSheetPoints(
-                            tmpRange.FirstAddress.RowNumber,
-                            tmpRange.FirstAddress.ColumnNumber,
-                            tmpRange.LastAddress.RowNumber,
-                            tmpRange.LastAddress.ColumnNumber);
-
-                        foreach (XLSheetPoint a in addressList.Where(a => !hash.Contains(a)))
-                        {
-                            hash.Add(a);
-                        }
-                    }
-                }
-                else
-                {
-                    var mm = new MinMax
-                                 {
-                                     MinRow = range.FirstAddress.RowNumber,
-                                     MaxRow = range.LastAddress.RowNumber,
-                                     MinColumn = range.FirstAddress.ColumnNumber,
-                                     MaxColumn = range.LastAddress.ColumnNumber
-                                 };
-                    if (mm.MaxRow > 0 && mm.MaxColumn > 0)
-                    {
-                        for (Int32 ro = mm.MinRow; ro <= mm.MaxRow; ro++)
-                        {
-                            for (Int32 co = mm.MinColumn; co <= mm.MaxColumn; co++)
-                            {
-                                if (oneRange)
-                                {
-                                    var c = range.Worksheet.Cell(ro, co);
-                                    if (_predicate == null || _predicate(c))
-                                        yield return c;
-                                }
-                                else
-                                {
-                                    var address = new XLSheetPoint(ro, co);
-                                    if (!hash.Contains(address))
-                                        hash.Add(address);
-                                }
-                            }
-                        }
-                    }
+                    var c = ws.Cell(sheetPoint.Row, sheetPoint.Column);
+                    if (_predicate(c))
+                        yield return c;
                 }
             }
+        }
 
-            if (!oneRange)
+        private IEnumerable<XLSheetPoint> GetAllCellsInRange(IXLRangeAddress rangeAddress)
+        {
+            if (!rangeAddress.IsValid)
+                yield break;
+
+            var normalizedAddress = ((XLRangeAddress)rangeAddress).Normalize();
+            var minRow = normalizedAddress.FirstAddress.RowNumber;
+            var maxRow = normalizedAddress.LastAddress.RowNumber;
+            var minColumn = normalizedAddress.FirstAddress.ColumnNumber;
+            var maxColumn = normalizedAddress.LastAddress.ColumnNumber;
+
+            for (var ro = minRow; ro <= maxRow; ro++)
             {
-                if (_usedCellsOnly)
+                for (var co = minColumn; co <= maxColumn; co++)
                 {
-                    var cellRange = cellsInRanges.SelectMany(
-                                cir =>
-                                cir.Value.Select(a => cir.Key.Internals.CellsCollection.GetCell(a)).Where(
-                                    cell => cell != null && (
-                                                                !cell.IsEmpty(_includeFormats) 
-                                                                && (_predicate == null || _predicate(cell))
-                                                                )));
+                    yield return new XLSheetPoint(ro, co);
+                }
+            }
+        }
 
-                    foreach (var cell in cellRange)
+        private IEnumerable<XLCell> GetUsedCells()
+        {
+            var visitedCells = new HashSet<XLAddress>();
+            var groupedAddresses = _rangeAddresses.GroupBy(addr => addr.Worksheet);
+            foreach (var worksheetGroup in groupedAddresses)
+            {
+                var ws = worksheetGroup.Key!;
+
+                var usedCellsCandidates = GetUsedCellsCandidates(ws);
+
+                var cells = worksheetGroup.SelectMany(addr => GetUsedCellsInRange(addr, ws, usedCellsCandidates))
+                    .OrderBy(cell => cell.Address.RowNumber)
+                    .ThenBy(cell => cell.Address.ColumnNumber);
+
+                visitedCells.Clear();
+                foreach (var cell in cells)
+                {
+                    if (visitedCells.Add(cell.Address))
                     {
                         yield return cell;
                     }
                 }
-                else
+            }
+        }
+
+        private IEnumerable<XLCell> GetUsedCellsInRange(XLRangeAddress rangeAddress, XLWorksheet worksheet, IEnumerable<XLSheetPoint> usedCellsCandidates)
+        {
+            if (!rangeAddress.IsValid)
+                yield break;
+            var normalizedAddress = rangeAddress.Normalize();
+            var minRow = normalizedAddress.FirstAddress.RowNumber;
+            var maxRow = normalizedAddress.LastAddress.RowNumber;
+            var minColumn = normalizedAddress.FirstAddress.ColumnNumber;
+            var maxColumn = normalizedAddress.LastAddress.ColumnNumber;
+
+            var cellRange = worksheet.Internals.CellsCollection
+                .GetCells(minRow, minColumn, maxRow, maxColumn, _predicate);
+
+            foreach (var cell in cellRange)
+            {
+                if (!cell.IsEmpty(_options) && _predicate(cell))
+                    yield return cell;
+            }
+
+            foreach (var sheetPoint in usedCellsCandidates)
+            {
+                if (sheetPoint.Row.Between(minRow, maxRow) &&
+                    sheetPoint.Column.Between(minColumn, maxColumn))
                 {
-                    foreach (var cir in cellsInRanges)
-                    {
-                        foreach (XLSheetPoint a in cir.Value)
-                        {
-                            var c = cir.Key.Cell(a.Row, a.Column);
-                            if (_predicate == null || _predicate(c))
-                                yield return c;
-                        }
-                    }
+                    var cell = worksheet.Cell(sheetPoint.Row, sheetPoint.Column);
+
+                    if (_predicate(cell))
+                        yield return cell;
                 }
             }
         }
 
-        #endregion
+        private IEnumerable<XLSheetPoint> GetUsedCellsCandidates(XLWorksheet worksheet)
+        {
+            var candidates = Enumerable.Empty<XLSheetPoint>();
+
+            if (_options == XLCellsUsedOptions.AllContents)
+            {
+                return candidates;
+            }
+
+            if (_options.HasFlag(XLCellsUsedOptions.MergedRanges))
+                candidates = candidates.Union(
+                    worksheet.Internals.MergedRanges.SelectMany(r => GetAllCellsInRange(r.RangeAddress)));
+
+            if (_options.HasFlag(XLCellsUsedOptions.ConditionalFormats))
+                candidates = candidates.Union(
+                    worksheet.ConditionalFormats.SelectMany(cf => cf.Ranges.SelectMany(r => GetAllCellsInRange(r.RangeAddress))));
+
+            if (_options.HasFlag(XLCellsUsedOptions.DataValidation))
+                candidates = candidates.Union(
+                        worksheet.DataValidations.SelectMany(dv => dv.Ranges.SelectMany(r => GetAllCellsInRange(r.RangeAddress))));
+
+            if (_options.HasFlag(XLCellsUsedOptions.Sparklines))
+                candidates = candidates.Union(
+                    worksheet.SparklineGroups.SelectMany(sg => sg).Select(sl => XLSheetPoint.FromAddress(sl.Location.Address)));
+
+            return candidates.Distinct();
+        }
+
+        public IEnumerator<XLCell> GetEnumerator()
+        {
+            return GetCells().GetEnumerator();
+        }
+
+        private IEnumerable<XLCell> GetCells()
+        {
+            return _usedCellsOnly ? GetUsedCells() : GetAllCells();
+        }
+
+        #endregion IEnumerable<XLCell> Members
 
         #region IXLCells Members
 
         IEnumerator<IXLCell> IEnumerable<IXLCell>.GetEnumerator()
         {
-            foreach (XLCell cell in this)
-                yield return cell;
+            return GetCells().GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -164,41 +178,25 @@ namespace ClosedXML.Excel
             return GetEnumerator();
         }
 
-        public IXLStyle Style
-        {
-            get { return _style; }
-            set
-            {
-                _style = new XLStyle(this, value);
-                this.ForEach<XLCell>(c => c.Style = _style);
-            }
-        }
-
-        public Object Value
+        public XLCellValue Value
         {
             set { this.ForEach<XLCell>(c => c.Value = value); }
         }
 
-        public IXLCells SetDataType(XLCellValues dataType)
-        {
-            this.ForEach<XLCell>(c => c.DataType = dataType);
-            return this;
-        }
-
-        public XLCellValues DataType
-        {
-            set { this.ForEach<XLCell>(c => c.DataType = value); }
-        }
-
-
-        public IXLCells Clear(XLClearOptions clearOptions = XLClearOptions.ContentsAndFormats)
+        public IXLCells Clear(XLClearOptions clearOptions = XLClearOptions.All)
         {
             this.ForEach<XLCell>(c => c.Clear(clearOptions));
             return this;
         }
 
-        public void DeleteComments() {
+        public void DeleteComments()
+        {
             this.ForEach<XLCell>(c => c.DeleteComment());
+        }
+
+        public void DeleteSparklines()
+        {
+            this.ForEach<XLCell>(c => c.DeleteSparkline());
         }
 
         public String FormulaA1
@@ -211,31 +209,20 @@ namespace ClosedXML.Excel
             set { this.ForEach<XLCell>(c => c.FormulaR1C1 = value); }
         }
 
-        #endregion
+        #endregion IXLCells Members
 
         #region IXLStylized Members
 
-        public IEnumerable<IXLStyle> Styles
+        protected override IEnumerable<XLStylizedBase> Children
         {
             get
             {
-                UpdatingStyle = true;
-                yield return _style;
                 foreach (XLCell c in this)
-                    yield return c.Style;
-                UpdatingStyle = false;
+                    yield return c;
             }
         }
 
-        public Boolean UpdatingStyle { get; set; }
-
-        public IXLStyle InnerStyle
-        {
-            get { return _style; }
-            set { _style = new XLStyle(this, value); }
-        }
-
-        public IXLRanges RangesUsed
+        public override IXLRanges RangesUsed
         {
             get
             {
@@ -245,31 +232,27 @@ namespace ClosedXML.Excel
             }
         }
 
-        #endregion
+        #endregion IXLStylized Members
 
         public void Add(XLRangeAddress rangeAddress)
         {
             _rangeAddresses.Add(rangeAddress);
+
+            if (_styleInitialized)
+                return;
+
+            var worksheetStyle = rangeAddress.Worksheet?.Style;
+            if (worksheetStyle == null)
+                return;
+
+            InnerStyle = worksheetStyle;
+            _styleInitialized = true;
         }
 
         public void Add(XLCell cell)
         {
-            _rangeAddresses.Add(new XLRangeAddress(cell.Address, cell.Address));
+            Add(new XLRangeAddress(cell.Address, cell.Address));
         }
-
-        //--
-
-        #region Nested type: MinMax
-
-        private struct MinMax
-        {
-            public Int32 MaxColumn;
-            public Int32 MaxRow;
-            public Int32 MinColumn;
-            public Int32 MinRow;
-        }
-
-        #endregion
 
         public void Select()
         {

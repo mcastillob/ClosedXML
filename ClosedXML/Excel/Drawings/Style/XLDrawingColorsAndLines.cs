@@ -1,7 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+#nullable disable
+
+using System;
 
 namespace ClosedXML.Excel
 {

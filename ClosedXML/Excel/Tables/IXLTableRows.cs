@@ -1,10 +1,14 @@
-﻿using System;
+#nullable disable
+
+// Keep this file CodeMaid organised and cleaned
 using System.Collections.Generic;
 
 namespace ClosedXML.Excel
 {
-    public interface IXLTableRows: IEnumerable<IXLTableRow>
+    public interface IXLTableRows : IEnumerable<IXLTableRow>
     {
+        IXLStyle Style { get; set; }
+
         /// <summary>
         /// Adds a table row to this group.
         /// </summary>
@@ -24,16 +28,16 @@ namespace ClosedXML.Excel
         /// <summary>
         /// Returns the collection of cells that have a value.
         /// </summary>
-        /// <param name="includeFormats">if set to <c>true</c> will return all cells with a value or a style different than the default.</param>
-        IXLCells CellsUsed(Boolean includeFormats);
-
-        IXLStyle Style { get; set; }
+        /// <param name="options">The options to determine whether a cell is used.</param>
+        IXLCells CellsUsed(XLCellsUsedOptions options);
 
         /// <summary>
         /// Clears the contents of these rows.
         /// </summary>
         /// <param name="clearOptions">Specify what you want to clear.</param>
-        IXLTableRows Clear(XLClearOptions clearOptions = XLClearOptions.ContentsAndFormats);
+        IXLTableRows Clear(XLClearOptions clearOptions = XLClearOptions.All);
+
+        void Delete();
 
         void Select();
     }

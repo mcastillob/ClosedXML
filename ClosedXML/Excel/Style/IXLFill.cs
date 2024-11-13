@@ -1,4 +1,6 @@
-﻿using System;
+#nullable disable
+
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -25,17 +27,18 @@ namespace ClosedXML.Excel
         Solid
     }
 
-    public interface IXLFill:IEquatable<IXLFill>
+    public interface IXLFill : IEquatable<IXLFill>
     {
         XLColor BackgroundColor { get; set; }
+
         XLColor PatternColor { get; set; }
-        XLColor PatternBackgroundColor { get; set; }
+
         XLFillPatternValues PatternType { get; set; }
 
         IXLStyle SetBackgroundColor(XLColor value);
-        IXLStyle SetPatternColor(XLColor value);
-        IXLStyle SetPatternBackgroundColor(XLColor value);
-        IXLStyle SetPatternType(XLFillPatternValues value);
 
+        IXLStyle SetPatternColor(XLColor value);
+
+        IXLStyle SetPatternType(XLFillPatternValues value);
     }
 }

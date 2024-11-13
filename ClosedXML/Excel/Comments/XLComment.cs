@@ -1,4 +1,6 @@
-﻿using System;
+#nullable disable
+
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -6,16 +8,16 @@ namespace ClosedXML.Excel
     {
         private XLCell _cell;
 
-        public XLComment(XLCell cell, IXLFontBase defaultFont)
-            : base(defaultFont)
+        public XLComment(XLCell cell, IXLFontBase defaultFont = null, int? shapeId = null)
+            : base(defaultFont ?? XLFont.DefaultCommentFont)
         {
-            Initialize(cell);
+            Initialize(cell, shapeId: shapeId);
         }
 
-        public XLComment(XLCell cell, XLFormattedText<IXLComment> defaultComment, IXLFontBase defaultFont)
+        public XLComment(XLCell cell, XLFormattedText<IXLComment> defaultComment, IXLFontBase defaultFont, IXLDrawingStyle style)
             : base(defaultComment, defaultFont)
         {
-            Initialize(cell);
+            Initialize(cell, style);
         }
 
         public XLComment(XLCell cell, String text, IXLFontBase defaultFont)
@@ -45,7 +47,7 @@ namespace ClosedXML.Excel
             _cell.DeleteComment();
         }
 
-        #endregion
+        #endregion IXLComment Members
 
         #region IXLDrawing
 
@@ -58,20 +60,7 @@ namespace ClosedXML.Excel
         public Int32 ExtentLength { get; set; }
         public Int32 ExtentWidth { get; set; }
         public Int32 ShapeId { get; internal set; }
-
-        private Boolean _visible;
-
-        public Boolean Visible
-        {
-            get
-            {
-                return _visible;
-            }
-            set
-            {
-                _visible = value;
-            }
-        }
+        public Boolean Visible { get; set; }
 
         public IXLComment SetVisible()
         {
@@ -151,57 +140,65 @@ namespace ClosedXML.Excel
             return Container;
         }
 
-        #endregion
+        #endregion IXLDrawing
 
-        private void Initialize(XLCell cell)
+        private void Initialize(XLCell cell, IXLDrawingStyle style = null, int? shapeId = null)
         {
+            style = style ?? XLDrawingStyle.DefaultCommentStyle;
+            shapeId = shapeId ?? cell.Worksheet.Workbook.ShapeIdManager.GetNext();
+
             Author = cell.Worksheet.Author;
             Container = this;
             Anchor = XLDrawingAnchor.MoveAndSizeWithCells;
             Style = new XLDrawingStyle();
-            Int32 pRow = cell.Address.RowNumber;
-            Double pRowOffset = 0;
-            if (pRow > 1)
+            Int32 previousRowNumber = cell.Address.RowNumber;
+            Double previousRowOffset = 0;
+
+            if (previousRowNumber > 1)
             {
-                pRow--;
-                double prevHeight = cell.Worksheet.Row(pRow).Height;
-                if (prevHeight > 7)
-                    pRowOffset = prevHeight - 7;
+                previousRowNumber--;
+
+                if (cell.Worksheet.Internals.RowsCollection.TryGetValue(previousRowNumber, out XLRow previousRow))
+                    previousRowOffset = Math.Max(0, previousRow.Height - 7);
+                else
+                    previousRowOffset = Math.Max(0, cell.Worksheet.RowHeight - 7);
             }
+
             Position = new XLDrawingPosition
-                           {
-                               Column = cell.Address.ColumnNumber + 1,
-                               ColumnOffset = 2,
-                               Row = pRow,
-                               RowOffset = pRowOffset
-                           };
+            {
+                Column = cell.Address.ColumnNumber + 1,
+                ColumnOffset = 2,
+                Row = previousRowNumber,
+                RowOffset = previousRowOffset
+            };
 
             ZOrder = cell.Worksheet.ZOrder++;
             Style
-                .Margins.SetLeft(0.1)
-                .Margins.SetRight(0.1)
-                .Margins.SetTop(0.05)
-                .Margins.SetBottom(0.05)
-                .Margins.SetAutomatic()
-                .Size.SetHeight(59.25)
-                .Size.SetWidth(19.2)
-                .ColorsAndLines.SetLineColor(XLColor.Black)
-                .ColorsAndLines.SetFillColor(XLColor.FromArgb(255, 255, 225))
-                .ColorsAndLines.SetLineDash(XLDashStyle.Solid)
-                .ColorsAndLines.SetLineStyle(XLLineStyle.Single)
-                .ColorsAndLines.SetLineWeight(0.75)
-                .ColorsAndLines.SetFillTransparency(1)
-                .ColorsAndLines.SetLineTransparency(1)
-                .Alignment.SetHorizontal(XLDrawingHorizontalAlignment.Left)
-                .Alignment.SetVertical(XLDrawingVerticalAlignment.Top)
-                .Alignment.SetDirection(XLDrawingTextDirection.Context)
-                .Alignment.SetOrientation(XLDrawingTextOrientation.LeftToRight)
-                .Properties.SetPositioning(XLDrawingAnchor.Absolute)
-                .Protection.SetLocked()
-                .Protection.SetLockText();
+                .Margins.SetLeft(style.Margins.Left)
+                .Margins.SetRight(style.Margins.Right)
+                .Margins.SetTop(style.Margins.Top)
+                .Margins.SetBottom(style.Margins.Bottom)
+                .Margins.SetAutomatic(style.Margins.Automatic)
+                .Size.SetHeight(style.Size.Height)
+                .Size.SetWidth(style.Size.Width)
+                .ColorsAndLines.SetLineColor(style.ColorsAndLines.LineColor)
+                .ColorsAndLines.SetFillColor(style.ColorsAndLines.FillColor)
+                .ColorsAndLines.SetLineDash(style.ColorsAndLines.LineDash)
+                .ColorsAndLines.SetLineStyle(style.ColorsAndLines.LineStyle)
+                .ColorsAndLines.SetLineWeight(style.ColorsAndLines.LineWeight)
+                .ColorsAndLines.SetFillTransparency(style.ColorsAndLines.FillTransparency)
+                .ColorsAndLines.SetLineTransparency(style.ColorsAndLines.LineTransparency)
+                .Alignment.SetHorizontal(style.Alignment.Horizontal)
+                .Alignment.SetVertical(style.Alignment.Vertical)
+                .Alignment.SetDirection(style.Alignment.Direction)
+                .Alignment.SetOrientation(style.Alignment.Orientation)
+                .Alignment.SetAutomaticSize(style.Alignment.AutomaticSize)
+                .Properties.SetPositioning(style.Properties.Positioning)
+                .Protection.SetLocked(style.Protection.Locked)
+                .Protection.SetLockText(style.Protection.LockText);
 
             _cell = cell;
-            ShapeId = cell.Worksheet.Workbook.ShapeIdManager.GetNext();
+            ShapeId = shapeId.Value;
         }
     }
 }

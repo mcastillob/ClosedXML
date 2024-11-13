@@ -1,4 +1,5 @@
-﻿
+#nullable disable
+
 namespace ClosedXML.Excel
 {
     public interface IXLTheme
@@ -15,5 +16,7 @@ namespace ClosedXML.Excel
         XLColor Accent6 { get; set; }
         XLColor Hyperlink { get; set; }
         XLColor FollowedHyperlink { get; set; }
+
+        XLColor ResolveThemeColor(XLThemeColor themeColor);
     }
 }

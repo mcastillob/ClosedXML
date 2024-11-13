@@ -1,8 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+#nullable disable
+
 using DocumentFormat.OpenXml.Spreadsheet;
+using System;
+using System.Collections.Generic;
 
 namespace ClosedXML.Excel
 {
@@ -11,27 +11,34 @@ namespace ClosedXML.Excel
         private static readonly Dictionary<XLConditionalFormatType, IXLCFConverter> Converters;
         static XLCFConverters()
         {
-            Converters = new Dictionary<XLConditionalFormatType, IXLCFConverter>();
-            Converters.Add(XLConditionalFormatType.ColorScale, new XLCFColorScaleConverter());
-            Converters.Add(XLConditionalFormatType.StartsWith, new XLCFStartsWithConverter());
-            Converters.Add(XLConditionalFormatType.EndsWith, new XLCFEndsWithConverter());
-            Converters.Add(XLConditionalFormatType.IsBlank, new XLCFIsBlankConverter());
-            Converters.Add(XLConditionalFormatType.NotBlank, new XLCFNotBlankConverter());
-            Converters.Add(XLConditionalFormatType.IsError, new XLCFIsErrorConverter());
-            Converters.Add(XLConditionalFormatType.NotError, new XLCFNotErrorConverter());
-            Converters.Add(XLConditionalFormatType.ContainsText, new XLCFContainsConverter());
-            Converters.Add(XLConditionalFormatType.NotContainsText, new XLCFNotContainsConverter());
-            Converters.Add(XLConditionalFormatType.CellIs, new XLCFCellIsConverter());
-            Converters.Add(XLConditionalFormatType.IsUnique, new XLCFUniqueConverter());
-            Converters.Add(XLConditionalFormatType.IsDuplicate, new XLCFUniqueConverter());
-            Converters.Add(XLConditionalFormatType.Expression, new XLCFCellIsConverter());
-            Converters.Add(XLConditionalFormatType.Top10, new XLCFTopConverter());
-            Converters.Add(XLConditionalFormatType.DataBar, new XLCFDataBarConverter());
-            Converters.Add(XLConditionalFormatType.IconSet, new XLCFIconSetConverter());
+            Converters = new Dictionary<XLConditionalFormatType, IXLCFConverter>
+            {
+                {XLConditionalFormatType.ColorScale, new XLCFColorScaleConverter()},
+                {XLConditionalFormatType.StartsWith, new XLCFStartsWithConverter()},
+                {XLConditionalFormatType.EndsWith, new XLCFEndsWithConverter()},
+                {XLConditionalFormatType.IsBlank, new XLCFIsBlankConverter()},
+                {XLConditionalFormatType.NotBlank, new XLCFNotBlankConverter()},
+                {XLConditionalFormatType.IsError, new XLCFIsErrorConverter()},
+                {XLConditionalFormatType.NotError, new XLCFNotErrorConverter()},
+                {XLConditionalFormatType.ContainsText, new XLCFContainsConverter()},
+                {XLConditionalFormatType.NotContainsText, new XLCFNotContainsConverter()},
+                {XLConditionalFormatType.CellIs, new XLCFCellIsConverter()},
+                {XLConditionalFormatType.IsUnique, new XLCFUniqueConverter()},
+                {XLConditionalFormatType.IsDuplicate, new XLCFUniqueConverter()},
+                {XLConditionalFormatType.Expression, new XLCFCellIsConverter()},
+                {XLConditionalFormatType.Top10, new XLCFTopConverter()},
+                {XLConditionalFormatType.DataBar, new XLCFDataBarConverter()},
+                {XLConditionalFormatType.IconSet, new XLCFIconSetConverter()},
+                {XLConditionalFormatType.TimePeriod, new XLCFDatesOccurringConverter()}
+            };
         }
+
         public static ConditionalFormattingRule Convert(IXLConditionalFormat conditionalFormat, Int32 priority, XLWorkbook.SaveContext context)
         {
-            return Converters[conditionalFormat.ConditionalFormatType].Convert(conditionalFormat, priority, context);
+            if (!Converters.TryGetValue(conditionalFormat.ConditionalFormatType, out var converter))
+                throw new NotImplementedException(string.Format("Conditional formatting rule '{0}' hasn't been implemented", conditionalFormat.ConditionalFormatType));
+
+            return converter.Convert(conditionalFormat, priority, context);
         }
     }
 }

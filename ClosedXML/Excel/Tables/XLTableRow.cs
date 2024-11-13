@@ -1,4 +1,6 @@
-﻿using System;
+#nullable disable
+
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -7,7 +9,7 @@ namespace ClosedXML.Excel
         private readonly XLTableRange _tableRange;
 
         public XLTableRow(XLTableRange tableRange, XLRangeRow rangeRow)
-            : base(rangeRow.RangeParameters, false)
+            : base(new XLRangeParameters(rangeRow.RangeAddress, rangeRow.Style))
         {
             _tableRange = tableRange;
         }
@@ -36,11 +38,11 @@ namespace ClosedXML.Excel
             return this;
         }
 
-        #endregion
+        #endregion IXLTableRow Members
 
         private XLTableRow RowShift(Int32 rowsToShift)
         {
-            return _tableRange.Row(RowNumber() + rowsToShift);
+            return _tableRange.Row(RowNumber() - _tableRange.FirstRow().RowNumber() + 1 + rowsToShift);
         }
 
         #region XLTableRow Above
@@ -65,7 +67,7 @@ namespace ClosedXML.Excel
             return RowShift(step * -1);
         }
 
-        #endregion
+        #endregion XLTableRow Above
 
         #region XLTableRow Below
 
@@ -89,9 +91,9 @@ namespace ClosedXML.Excel
             return RowShift(step);
         }
 
-        #endregion
+        #endregion XLTableRow Below
 
-        public new IXLTableRow Clear(XLClearOptions clearOptions = XLClearOptions.ContentsAndFormats)
+        public new IXLTableRow Clear(XLClearOptions clearOptions = XLClearOptions.All)
         {
             base.Clear(clearOptions);
             return this;
@@ -101,6 +103,7 @@ namespace ClosedXML.Excel
         {
             return XLHelper.InsertRowsWithoutEvents(base.InsertRowsAbove, _tableRange, numberOfRows, !_tableRange.Table.ShowTotalsRow);
         }
+
         public new IXLTableRows InsertRowsBelow(int numberOfRows)
         {
             return XLHelper.InsertRowsWithoutEvents(base.InsertRowsBelow, _tableRange, numberOfRows, !_tableRange.Table.ShowTotalsRow);
@@ -109,7 +112,6 @@ namespace ClosedXML.Excel
         public new void Delete()
         {
             Delete(XLShiftDeletedCells.ShiftCellsUp);
-            _tableRange.Table.ExpandTableRows(-1);
         }
     }
 }

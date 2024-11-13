@@ -1,5 +1,6 @@
-﻿using System;
-using System.Linq;
+#nullable disable
+
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -63,7 +64,22 @@ namespace ClosedXML.Excel
             }
         }
 
-        public IXLCell Cell { get; internal set; }
+#nullable enable
+        /// <summary>
+        /// Gets top left cell of a hyperlink range. Return <c>null</c>,
+        /// if the hyperlink isn't in a worksheet.
+        /// </summary>
+        public IXLCell? Cell
+        {
+            get
+            {
+                if (Container is null)
+                    return null;
+
+                return Container.GetCell(this);
+            }
+        }
+#nullable disable
 
         public String InternalAddress
         {
@@ -74,11 +90,23 @@ namespace ClosedXML.Excel
                 if (_internalAddress.Contains('!'))
                 {
                     return _internalAddress[0] != '\''
-                               ? String.Format("'{0}'!{1}", _internalAddress.Substring(0, _internalAddress.IndexOf('!')),
-                                               _internalAddress.Substring(_internalAddress.IndexOf('!') + 1))
+                               ? String.Concat(
+                                    _internalAddress
+                                        .Substring(0, _internalAddress.IndexOf('!'))
+                                        .EscapeSheetName(),
+                                    '!',
+                                    _internalAddress.Substring(_internalAddress.IndexOf('!') + 1))
                                : _internalAddress;
                 }
-                return String.Format("'{0}'!{1}", Worksheet.Name, _internalAddress);
+
+                if (Container is null)
+                    throw new InvalidOperationException("Hyperlink is not attached to a worksheet.");
+
+                var sheetName = Container.WorksheetName;
+                return String.Concat(
+                    sheetName.EscapeSheetName(),
+                    '!',
+                    _internalAddress);
             }
             set
             {
@@ -87,16 +115,16 @@ namespace ClosedXML.Excel
             }
         }
 
+        /// <summary>
+        /// Tooltip displayed when user hovers over the hyperlink range. If not specified,
+        /// the link target is displayed in the tooltip.
+        /// </summary>
         public String Tooltip { get; set; }
 
+        /// <inheritdoc cref="IXLHyperlinks.Delete(XLHyperlink)"/>
         public void Delete()
         {
-            if (Cell == null) return;
-            Worksheet.Hyperlinks.Delete(Cell.Address);
-            if (Cell.Style.Font.FontColor.Equals(XLColor.FromTheme(XLThemeColor.Hyperlink)))
-                Cell.Style.Font.FontColor = Worksheet.Style.Font.FontColor;
-
-            Cell.Style.Font.Underline = Worksheet.Style.Font.Underline;
+            Container?.Delete(this);
         }
     }
 }

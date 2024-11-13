@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using DocumentFormat.OpenXml.Spreadsheet;
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -12,20 +9,20 @@ namespace ClosedXML.Excel
         {
             String val = GetQuoted(cf.Values[1]);
 
+            var conditionalFormattingRule = XLCFBaseConverter.Convert(cf, priority);
+            var cfStyle = ((XLStyle)cf.Style).Value;
+            if (!cfStyle.Equals(XLWorkbook.DefaultStyleValue))
+                conditionalFormattingRule.FormatId = (UInt32)context.DifferentialFormats[cfStyle];
 
-            var conditionalFormattingRule = new ConditionalFormattingRule { FormatId = (UInt32)context.DifferentialFormats[cf.Style], Operator = cf.Operator.ToOpenXml(), Type = cf.ConditionalFormatType.ToOpenXml(), Priority = priority };
+            conditionalFormattingRule.Operator = cf.Operator.ToOpenXml();
 
-            var formula = new Formula();
-            if (cf.Operator == XLCFOperator.Equal || cf.Operator == XLCFOperator.NotEqual)
-                formula.Text = val;
-            else
-                formula.Text = val;
+            var formula = new Formula(val);
             conditionalFormattingRule.Append(formula);
 
-            if(cf.Operator == XLCFOperator.Between || cf.Operator == XLCFOperator.NotBetween)
+            if (cf.Operator == XLCFOperator.Between || cf.Operator == XLCFOperator.NotBetween)
             {
                 var formula2 = new Formula { Text = GetQuoted(cf.Values[2]) };
-                conditionalFormattingRule.Append(formula2);    
+                conditionalFormattingRule.Append(formula2);
             }
 
             return conditionalFormattingRule;
@@ -34,13 +31,15 @@ namespace ClosedXML.Excel
         private String GetQuoted(XLFormula formula)
         {
             String value = formula.Value;
-            Double num;
-            if ((!Double.TryParse(value, out num) && !formula.IsFormula) && value[0] != '\"' && !value.EndsWith("\""))
-                return String.Format("\"{0}\"", value.Replace("\"", "\"\""));
 
-            return value;
+            if (formula.IsFormula ||
+                value.StartsWith("\"") && value.EndsWith("\"") ||
+                Double.TryParse(value, XLHelper.NumberStyle, XLHelper.ParseCulture, out _))
+            {
+                return value;
+            }
+
+            return String.Format("\"{0}\"", value.Replace("\"", "\"\""));
         }
-
-
     }
 }

@@ -1,9 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using DocumentFormat.OpenXml;
+#nullable disable
+
 using DocumentFormat.OpenXml.Spreadsheet;
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -11,13 +9,13 @@ namespace ClosedXML.Excel
     {
         public ConditionalFormattingRule Convert(IXLConditionalFormat cf, Int32 priority, XLWorkbook.SaveContext context)
         {
-            var conditionalFormattingRule = new ConditionalFormattingRule { Type = cf.ConditionalFormatType.ToOpenXml(), Priority = priority };
+            var conditionalFormattingRule = XLCFBaseConverter.Convert(cf, priority);
 
             var colorScale = new ColorScale();
             for (Int32 i = 1; i <= cf.ContentTypes.Count; i++)
             {
                 var type = cf.ContentTypes[i].ToOpenXml();
-                var val = (cf.Values.ContainsKey(i) && cf.Values[i] != null) ? cf.Values[i].Value : null;
+                var val = cf.Values.TryGetValue(i, out XLFormula formula) ? formula?.Value : null;
 
                 var conditionalFormatValueObject = new ConditionalFormatValueObject { Type = type };
                 if (val != null)
@@ -28,7 +26,22 @@ namespace ClosedXML.Excel
 
             for (Int32 i = 1; i <= cf.Colors.Count; i++)
             {
-                Color color = new Color { Rgb = cf.Colors[i].Color.ToHex() };
+                var xlColor = cf.Colors[i];
+                var color = new Color();
+                switch (xlColor.ColorType)
+                {
+                    case XLColorType.Color:
+                        color.Rgb = xlColor.Color.ToHex();
+                        break;
+                    case XLColorType.Theme:
+                        color.Theme = System.Convert.ToUInt32(xlColor.ThemeColor);
+                        break;
+
+                    case XLColorType.Indexed:
+                        color.Indexed = System.Convert.ToUInt32(xlColor.Indexed);
+                        break;
+                }
+
                 colorScale.Append(color);
             }
 

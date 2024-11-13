@@ -1,4 +1,6 @@
-﻿namespace ClosedXML.Excel
+#nullable disable
+
+namespace ClosedXML.Excel
 {
     internal class XLRangeParameters
     {
@@ -7,7 +9,6 @@
         public XLRangeParameters(XLRangeAddress rangeAddress, IXLStyle defaultStyle)
         {
             RangeAddress = rangeAddress;
-            _ignoreEvents = !rangeAddress.Worksheet.EventTrackingEnabled;
             DefaultStyle = defaultStyle;
         }
 
@@ -18,16 +19,6 @@
         public XLRangeAddress RangeAddress { get; private set; }
 
         public IXLStyle DefaultStyle { get; private set; }
-        private bool _ignoreEvents;
-        public bool IgnoreEvents
-        { 
-            get { return _ignoreEvents; } 
-            set
-            {
-                _ignoreEvents = value;
-            } 
-        }
-
         #endregion
     }
 }

@@ -1,14 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using System;
 
 namespace ClosedXML.Excel
 {
     public interface IXLDrawingWeb
     {
-        String AlternateText { get; set; }
-        IXLDrawingStyle SetAlternateText(String value);
-
+        String? AlternateText { get; set; }
+        IXLDrawingStyle SetAlternateText(String? value);
     }
 }

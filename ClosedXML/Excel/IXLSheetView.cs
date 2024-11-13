@@ -1,4 +1,7 @@
-﻿using System;
+#nullable disable
+
+// Keep this file CodeMaid organised and cleaned
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -16,28 +19,38 @@ namespace ClosedXML.Excel
         /// </summary>
         Int32 SplitRow { get; set; }
 
+        /// <summary>
+        /// Gets or sets the location of the top left visible cell
+        /// </summary>
+        /// <value>
+        /// The scroll position's top left cell.
+        /// </value>
+        IXLAddress TopLeftCellAddress { get; set; }
+
         XLSheetViewOptions View { get; set; }
 
+        IXLWorksheet Worksheet { get; }
+
         /// <summary>
-        /// Window zoom magnification for current view representing percent values. Horizontal & Vertical scale together.
+        /// Window zoom magnification for current view representing percent values. Horizontal and vertical scale together.
         /// </summary>
         /// <remarks>Representing percent values ranging from 10 to 400.</remarks>
         Int32 ZoomScale { get; set; }
 
         /// <summary>
-        /// Zoom magnification to use when in normal view. Horizontal & Vertical scale together
+        /// Zoom magnification to use when in normal view. Horizontal and vertical scale together
         /// </summary>
         /// <remarks>Representing percent values ranging from 10 to 400.</remarks>
         Int32 ZoomScaleNormal { get; set; }
 
         /// <summary>
-        /// Zoom magnification to use when in page layout view. Horizontal & Vertical scale together.
+        /// Zoom magnification to use when in page layout view. Horizontal and vertical scale together.
         /// </summary>
         /// <remarks>Representing percent values ranging from 10 to 400.</remarks>
         Int32 ZoomScalePageLayoutView { get; set; }
 
         /// <summary>
-        /// Zoom magnification to use when in page break preview. Horizontal & Vertical scale together.
+        /// Zoom magnification to use when in page break preview. Horizontal and vertical scale together.
         /// </summary>
         /// <remarks>Representing percent values ranging from 10 to 400.</remarks>
         Int32 ZoomScaleSheetLayoutView { get; set; }

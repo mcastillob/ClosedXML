@@ -1,10 +1,13 @@
-﻿using System;
+#nullable disable
+
+using System;
+
 namespace ClosedXML.Excel
 {
-    internal class XLWorksheetInternals: IDisposable
+    internal class XLWorksheetInternals : IDisposable
     {
         public XLWorksheetInternals(
-            XLCellsCollection cellsCollection, 
+            XLCellsCollection cellsCollection,
             XLColumnsCollection columnsCollection,
             XLRowsCollection rowsCollection,
             XLRanges mergedRanges
@@ -16,16 +19,24 @@ namespace ClosedXML.Excel
             MergedRanges = mergedRanges;
         }
 
-        public XLCellsCollection CellsCollection { get; private set; }
-        public XLColumnsCollection ColumnsCollection { get; private set; }
-        public XLRowsCollection RowsCollection { get; private set; }
+        public XLCellsCollection CellsCollection { get; }
+        public XLColumnsCollection ColumnsCollection { get; }
+        public XLRowsCollection RowsCollection { get; }
         public XLRanges MergedRanges { get; internal set; }
+
+        // Used by Janitor.Fody
+        private void DisposeManaged()
+        {
+            CellsCollection.ValueSlice.DereferenceSlice();
+            CellsCollection.Clear();
+            ColumnsCollection.Clear();
+            RowsCollection.Clear();
+            MergedRanges.RemoveAll();
+        }
 
         public void Dispose()
         {
-            ColumnsCollection.Dispose();
-            RowsCollection.Dispose();
-            MergedRanges.Dispose();
+            // Leave this empty so that Janitor.Fody can do its work
         }
     }
 }

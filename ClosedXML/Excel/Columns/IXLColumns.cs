@@ -1,9 +1,11 @@
-﻿using System;
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 
 namespace ClosedXML.Excel
 {
-    public interface IXLColumns: IEnumerable<IXLColumn>, IDisposable
+    public interface IXLColumns : IEnumerable<IXLColumn>
     {
         /// <summary>
         /// Sets the width of all columns.
@@ -22,11 +24,13 @@ namespace ClosedXML.Excel
         /// Adjusts the width of all columns based on its contents.
         /// </summary>
         IXLColumns AdjustToContents();
+
         /// <summary>
         /// Adjusts the width of all columns based on its contents, starting from the startRow.
         /// </summary>
         /// <param name="startRow">The row to start calculating the column width.</param>
         IXLColumns AdjustToContents(Int32 startRow);
+
         /// <summary>
         /// Adjusts the width of all columns based on its contents, starting from the startRow and ending at endRow.
         /// </summary>
@@ -35,7 +39,9 @@ namespace ClosedXML.Excel
         IXLColumns AdjustToContents(Int32 startRow, Int32 endRow);
 
         IXLColumns AdjustToContents(Double minWidth, Double maxWidth);
+
         IXLColumns AdjustToContents(Int32 startRow, Double minWidth, Double maxWidth);
+
         IXLColumns AdjustToContents(Int32 startRow, Int32 endRow, Double minWidth, Double maxWidth);
 
         /// <summary>
@@ -93,7 +99,7 @@ namespace ClosedXML.Excel
         /// Returns the collection of cells.
         /// </summary>
         IXLCells Cells();
-        
+
         /// <summary>
         /// Returns the collection of cells that have a value.
         /// </summary>
@@ -112,13 +118,11 @@ namespace ClosedXML.Excel
         /// </summary>
         IXLColumns AddVerticalPageBreaks();
 
-        IXLColumns SetDataType(XLCellValues dataType);
-
         /// <summary>
         /// Clears the contents of these columns.
         /// </summary>
         /// <param name="clearOptions">Specify what you want to clear.</param>
-        IXLColumns Clear(XLClearOptions clearOptions = XLClearOptions.ContentsAndFormats);
+        IXLColumns Clear(XLClearOptions clearOptions = XLClearOptions.All);
 
         void Select();
     }

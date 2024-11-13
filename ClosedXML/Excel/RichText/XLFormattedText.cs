@@ -1,21 +1,21 @@
-﻿using System;
+#nullable disable
+
+using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Linq;
 
 namespace ClosedXML.Excel
 {
-    internal class XLFormattedText<T>: IXLFormattedText<T>
+    internal class XLFormattedText<T> : IXLFormattedText<T>
     {
-        List<IXLRichString> _richTexts = new List<IXLRichString>();
-
+        /// <summary>
+        /// Font used for a new rich text run, never modified. It is generally provided by a container of the formatted text.
+        /// </summary>
+        private readonly IXLFontBase _defaultFont;
+        private List<XLRichString> _richTexts = new();
+        private XLPhonetics _phonetics;
         protected T Container;
-        readonly IXLFontBase _defaultFont;
-        public XLFormattedText(IXLFontBase defaultFont)
-        {
-            Length = 0;
-            _defaultFont = defaultFont;
-        }
 
         public XLFormattedText(IXLFormattedText<T> defaultRichText, IXLFontBase defaultFont)
             : this(defaultFont)
@@ -24,33 +24,51 @@ namespace ClosedXML.Excel
                 AddText(rt.Text, rt);
             if (defaultRichText.HasPhonetics)
             {
-                _phonetics = new XLPhonetics(defaultRichText.Phonetics, defaultFont);
+                _phonetics = new XLPhonetics(defaultRichText.Phonetics, defaultFont, OnContentChanged);
             }
         }
 
         public XLFormattedText(String text, IXLFontBase defaultFont)
-            :this(defaultFont)
+            : this(defaultFont)
         {
             AddText(text);
         }
 
-        public Int32 Count { get { return _richTexts.Count; } }
+        public XLFormattedText(IXLFontBase defaultFont)
+        {
+            Length = 0;
+            _defaultFont = defaultFont;
+        }
+
+        IXLPhonetics IXLFormattedText<T>.Phonetics => Phonetics;
+
+        public Int32 Count => _richTexts.Count;
+
         public int Length { get; private set; }
+
+        public String Text => ToString();
+
+        public Boolean HasPhonetics => _phonetics is not null;
+
+        /// <inheritdoc cref="IXLFormattedText{T}.Phonetics"/>
+        internal XLPhonetics Phonetics => _phonetics ??= new XLPhonetics(_defaultFont, OnContentChanged);
 
         public IXLRichString AddText(String text)
         {
             return AddText(text, _defaultFont);
         }
+
         public IXLRichString AddText(String text, IXLFontBase font)
         {
-            var richText = new XLRichString(text, font, this);
+            var richText = new XLRichString(text, font, this, OnContentChanged);
             return AddText(richText);
         }
 
-        public IXLRichString AddText(IXLRichString richText)
+        public IXLRichString AddText(XLRichString richText)
         {
             _richTexts.Add(richText);
             Length += richText.Text.Length;
+            OnContentChanged();
             return richText;
         }
 
@@ -63,8 +81,10 @@ namespace ClosedXML.Excel
         {
             _richTexts.Clear();
             Length = 0;
+            OnContentChanged();
             return this;
         }
+
         public IXLFormattedText<T> ClearFont()
         {
             String text = Text;
@@ -84,12 +104,13 @@ namespace ClosedXML.Excel
         {
             return Substring(index, Length - index);
         }
+
         public IXLFormattedText<T> Substring(Int32 index, Int32 length)
         {
             if (index + 1 > Length || (Length - index + 1) < length || length <= 0)
                 throw new IndexOutOfRangeException("Index and length must refer to a location within the string.");
 
-            List<IXLRichString> newRichTexts = new List<IXLRichString>();
+            var newRichTexts = new List<XLRichString>();
             var retVal = new XLFormattedText<T>(_defaultFont);
 
             Int32 lastPosition = 0;
@@ -104,7 +125,7 @@ namespace ClosedXML.Excel
                     Int32 startIndex = index - lastPosition;
 
                     if (startIndex > 0)
-                        newRichTexts.Add(new XLRichString(rt.Text.Substring(0, startIndex), rt, this));
+                        newRichTexts.Add(new XLRichString(rt.Text.Substring(0, startIndex), rt, this, OnContentChanged));
                     else if (startIndex < 0)
                         startIndex = 0;
 
@@ -112,12 +133,12 @@ namespace ClosedXML.Excel
                     if (leftToTake > rt.Text.Length - startIndex)
                         leftToTake = rt.Text.Length - startIndex;
 
-                    XLRichString newRt = new XLRichString(rt.Text.Substring(startIndex, leftToTake), rt, this);
+                    var newRt = new XLRichString(rt.Text.Substring(startIndex, leftToTake), rt, this, OnContentChanged);
                     newRichTexts.Add(newRt);
                     retVal.AddText(newRt);
 
                     if (startIndex + leftToTake < rt.Text.Length)
-                        newRichTexts.Add(new XLRichString(rt.Text.Substring(startIndex + leftToTake), rt, this));
+                        newRichTexts.Add(new XLRichString(rt.Text.Substring(startIndex + leftToTake), rt, this, OnContentChanged));
                 }
                 else // We haven't reached the desired position yet
                 {
@@ -126,18 +147,24 @@ namespace ClosedXML.Excel
                 lastPosition += rt.Text.Length;
             }
             _richTexts = newRichTexts;
+            OnContentChanged();
             return retVal;
         }
 
-        public IEnumerator<IXLRichString> GetEnumerator()
+        public IXLFormattedText<T> CopyFrom(IXLFormattedText<T> original)
         {
-            return _richTexts.GetEnumerator();
+            ClearText();
+            foreach (var richText in original)
+                AddText(new XLRichString(richText.Text, richText, this, OnContentChanged));
+
+            return this;
         }
 
-        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
+        public List<XLRichString>.Enumerator GetEnumerator() => _richTexts.GetEnumerator();
+
+        IEnumerator<IXLRichString> IEnumerable<IXLRichString>.GetEnumerator() => GetEnumerator();
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => GetEnumerator();
 
         public Boolean Bold { set { _richTexts.ForEach(rt => rt.Bold = value); } }
         public Boolean Italic { set { _richTexts.ForEach(rt => rt.Italic = value); } }
@@ -150,12 +177,17 @@ namespace ClosedXML.Excel
         public String FontName { set { _richTexts.ForEach(rt => rt.FontName = value); } }
         public XLFontFamilyNumberingValues FontFamilyNumbering { set { _richTexts.ForEach(rt => rt.FontFamilyNumbering = value); } }
 
-        public IXLFormattedText<T> SetBold() { Bold = true; return this; }	public IXLFormattedText<T> SetBold(Boolean value) { Bold = value; return this; }
-        public IXLFormattedText<T> SetItalic() { Italic = true; return this; }	public IXLFormattedText<T> SetItalic(Boolean value) { Italic = value; return this; }
-        public IXLFormattedText<T> SetUnderline() { Underline = XLFontUnderlineValues.Single; return this; }	public IXLFormattedText<T> SetUnderline(XLFontUnderlineValues value) { Underline = value; return this; }
-        public IXLFormattedText<T> SetStrikethrough() { Strikethrough = true; return this; }	public IXLFormattedText<T> SetStrikethrough(Boolean value) { Strikethrough = value; return this; }
+        public IXLFormattedText<T> SetBold() { Bold = true; return this; }
+        public IXLFormattedText<T> SetBold(Boolean value) { Bold = value; return this; }
+        public IXLFormattedText<T> SetItalic() { Italic = true; return this; }
+        public IXLFormattedText<T> SetItalic(Boolean value) { Italic = value; return this; }
+        public IXLFormattedText<T> SetUnderline() { Underline = XLFontUnderlineValues.Single; return this; }
+        public IXLFormattedText<T> SetUnderline(XLFontUnderlineValues value) { Underline = value; return this; }
+        public IXLFormattedText<T> SetStrikethrough() { Strikethrough = true; return this; }
+        public IXLFormattedText<T> SetStrikethrough(Boolean value) { Strikethrough = value; return this; }
         public IXLFormattedText<T> SetVerticalAlignment(XLFontVerticalTextAlignmentValues value) { VerticalAlignment = value; return this; }
-        public IXLFormattedText<T> SetShadow() { Shadow = true; return this; }	public IXLFormattedText<T> SetShadow(Boolean value) { Shadow = value; return this; }
+        public IXLFormattedText<T> SetShadow() { Shadow = true; return this; }
+        public IXLFormattedText<T> SetShadow(Boolean value) { Shadow = value; return this; }
         public IXLFormattedText<T> SetFontSize(Double value) { FontSize = value; return this; }
         public IXLFormattedText<T> SetFontColor(XLColor value) { FontColor = value; return this; }
         public IXLFormattedText<T> SetFontName(String value) { FontName = value; return this; }
@@ -163,27 +195,27 @@ namespace ClosedXML.Excel
 
         public bool Equals(IXLFormattedText<T> other)
         {
-            Int32 count = Count;
-            if (count != other.Count)
+            if (other is null)
                 return false;
 
-            for (Int32 i = 0; i < count; i++)
-            {
-                if (_richTexts.ElementAt(i) != other.ElementAt(i))
-                    return false;
-            }
+            if (ReferenceEquals(this, other))
+                return true;
 
-            return _phonetics == null || Phonetics.Equals(other.Phonetics);
+            if (Count != other.Count)
+                return false;
+
+            if (!_richTexts.SequenceEqual(other))
+                return false;
+
+            return (_phonetics is null && !other.HasPhonetics) || Phonetics.Equals(other.Phonetics);
         }
 
-        public String Text { get { return ToString(); } }
-
-        private IXLPhonetics _phonetics;
-        public IXLPhonetics Phonetics 
+        /// <summary>
+        /// This method is called every time the formatted text is changed (new runs, font props, phonetics...).
+        /// </summary>
+        protected virtual void OnContentChanged()
         {
-            get { return _phonetics ?? (_phonetics = new XLPhonetics(_defaultFont)); }
+            // Do nothing, intended to be overriden.
         }
-
-        public Boolean HasPhonetics { get { return _phonetics != null; } }
     }
 }

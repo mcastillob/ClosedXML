@@ -1,8 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using DocumentFormat.OpenXml.Spreadsheet;
+using System;
 
 namespace ClosedXML.Excel
 {
@@ -11,7 +8,13 @@ namespace ClosedXML.Excel
         public ConditionalFormattingRule Convert(IXLConditionalFormat cf, int priority, XLWorkbook.SaveContext context)
         {
             String val = cf.Values[1].Value;
-            var conditionalFormattingRule = new ConditionalFormattingRule { FormatId = (UInt32)context.DifferentialFormats[cf.Style], Operator = ConditionalFormattingOperatorValues.ContainsText, Text = val, Type = cf.ConditionalFormatType.ToOpenXml(), Priority = priority };
+            var conditionalFormattingRule = XLCFBaseConverter.Convert(cf, priority);
+            var cfStyle = ((XLStyle)cf.Style).Value;
+            if (!cfStyle.Equals(XLWorkbook.DefaultStyleValue))
+                conditionalFormattingRule.FormatId = (UInt32)context.DifferentialFormats[cfStyle];
+
+            conditionalFormattingRule.Operator = ConditionalFormattingOperatorValues.ContainsText;
+            conditionalFormattingRule.Text = val;
 
             var formula = new Formula { Text = "NOT(ISERROR(SEARCH(\"" + val + "\"," + cf.Range.RangeAddress.FirstAddress.ToStringRelative(false) + ")))" };
 
@@ -19,7 +22,5 @@ namespace ClosedXML.Excel
 
             return conditionalFormattingRule;
         }
-
-
     }
 }

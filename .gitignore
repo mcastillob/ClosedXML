@@ -19,6 +19,7 @@ Thumbs.db
 *.cache
 *.ilk
 *.log
+.vs/
 [Bb]in
 [Dd]ebug*/
 *.lib
@@ -28,3 +29,4 @@ obj/
 _ReSharper*/
 [Tt]est[Rr]esult*
 /packages
+.idea/
