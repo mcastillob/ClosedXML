@@ -65,6 +65,12 @@ namespace ClosedXML.Excel.IO
             // TODO: Implement other sources besides worksheetSource
             // But for now assume names and references point directly to a range
             var wss = pivotTableCacheDefinitionPart.PivotCacheDefinition.CacheSource.WorksheetSource;
+            var cacheType=pivotTableCacheDefinitionPart.PivotCacheDefinition.CacheSource.Type;
+
+            if(cacheType.InnerText.Equals("external")){
+
+             return null;
+            }
 
             if (!String.IsNullOrEmpty(wss.Id))
             {

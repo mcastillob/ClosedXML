@@ -29,10 +29,15 @@ internal class PivotTableDefinitionPartReader
 
         if (pivotSource == null)
         {
+            var PivotSourceReference = PivotTableCacheDefinitionPartReader.ParsePivotSourceReference(cache);
+
+            if(PivotSourceReference !=null){
+
             // If it's missing, find a 'similar' pivot cache, i.e. one that's based on the same source range/table
             pivotSource = workbook.PivotCachesInternal
                 .FirstOrDefault<XLPivotCache>(ps =>
-                    ps.PivotSourceReference.Equals(PivotTableCacheDefinitionPartReader.ParsePivotSourceReference(cache)));
+                    ps.PivotSourceReference.Equals(PivotSourceReference));
+            }
         }
 
         var pivotTableDefinition = pivotTablePart.PivotTableDefinition;
